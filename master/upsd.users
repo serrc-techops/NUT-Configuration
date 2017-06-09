@@ -1,0 +1,40 @@
+# Network UPS Tools: Master upsd.users
+# ============================================================================
+# Original: https://github.com/networkupstools/nut/blob/master/conf/upsd.users.sample
+#
+# This file sets the permissions for upsd - the UPS network daemon.
+# Users are defined here, are given passwords, and their privileges are
+# controlled here too.
+#
+# Each user gets a section. To start a section, put the username in
+# brackets on a line by itself. To set something for that user, specify
+# it under that section heading. The username is case-sensitive, so
+# admin and AdMiN are two different users.
+#
+# The general form is:
+#
+# [<username>]
+#   password = <password>
+#   actions = <action>
+#   instcmds = <commands>
+#
+# password: The user's password.  This is case-sensitive.
+#
+# actions: Let the user do certain things with upsd. Valid actions are:
+#   SET   - change the value of certain variables in the UPS
+#   FSD   - set the "forced shutdown" flag in the UPS
+#
+# instcmds: Let the user initiate specific instant commands.  Use "ALL"
+#   to grant all commands automatically.  There are many possible
+#   commands, so use 'upscmd -l' to see what your hardware supports.
+# ============================================================================
+
+[upsmaster]
+    password  = <masterpassword>
+    actions = SET
+    instcmds = ALL
+    upsmon master
+
+[upsslave]
+    password = <slavepassword>
+    upsmon slave

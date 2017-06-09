@@ -1,0 +1,105 @@
+#!/bin/bash
+# perform actions depending on UPS event
+
+main() {
+
+	# client site
+	site="MET"
+
+	# array of email addresses to notify 
+	notification_addresses=( techops@serrc.org nathanr@serrc.org )
+
+	case $1 in
+
+		replbatt)
+			get_ups_stats
+			notification_subject="Bad Battery"
+			notification_body="$UPSNAME has a bad battery, replacement needed. $ups_stats"
+			send_notification_email "$notification_subject" "$notification_body"
+			touch /var/run/nut/onbatt
+		;;
+
+		onbatt)
+			get_ups_stats
+			notification_subject="On Battery"
+			notification_body="$UPSNAME has been on battery for over five minutes. $ups_stats"
+			send_notification_email "$notification_subject" "$notification_body"
+			touch /var/run/nut/onbatt
+		;;
+
+		fsd)
+			get_ups_stats
+			notification_subject="Forced Shutdown"
+			notification_body="$UPSNAME is forcing shutdown. $ups_stats"
+			send_notification_email "$notification_subject" "$notification_body"
+			do_shutdown
+		;;
+
+		shutdown)
+			get_ups_stats
+			notification_subject="System Shutdown"
+			notification_body="$UPSNAME is shutdowning down system. $ups_stats"
+			send_notification_email "$notification_subject" "$notification_body"
+			do_shutdown
+		;;
+
+		online)
+			get_ups_stats
+			notification_subject="Power Restored"
+			notification_body="Power has been restored to $UPSNAME. $ups_stats"
+			send_notification_email "$notification_subject" "$notification_body"
+		;;
+	
+		NOCOMM)
+			notification_subject="Unavailable"
+			notification_body="$UPSNAME is unavailable."
+			send_notification_email "$notification_subject" "$notification_body"
+		;;
+
+		commbad)
+			notification_subject="Communication Lost"
+			notification_body="Communication has been lost with UPS $UPSNAME."
+			send_notification_email "$notification_subject" "$notification_body"
+		;;
+
+		commok)
+			get_ups_stats
+			notification_subject="Communication Restored"
+			notification_body="Communication has been restored with UPS $UPSNAME. $ups_stats"
+			send_notification_email "$notification_subject" "$notification_body"
+		;;
+		
+		*)
+			echo "wrong parameter"
+		;;
+	esac
+	
+	exit 0
+}
+
+get_ups_stats() {
+	# get UPS status info
+	ups_status=$(upsc $UPSNAME@localhost ups.status > /dev/stdout 2> /dev/null)
+	batt_charge=$(upsc $UPSNAME@localhost battery.charge > /dev/stdout 2> /dev/null)
+	batt_runtime=$(upsc $UPSNAME@localhost battery.runtime > /dev/stdout 2> /dev/null)
+	ups_log=$(cat /var/log/messages | grep ups | tail -50 > /dev/stdout 2> /dev/null)
+	ups_stats="\n\n\tUPS Status: $ups_status\n\tUPS Battery Charge: $batt_charge%\n\tUPS Runtime: $batt_runtime seconds\n\n\tNUT Log:\n\t$ups_log"
+}
+
+send_notification_email () {
+	# send notification email
+	date=$(/bin/date "+%Y/%m/%d %H:%M:%S")
+	for email_address in "${notification_addresses[@]}"; do
+		/usr/bin/mailx -s "$site UPS $UPSNAME $1" "$email_address" < "$date - Site: $site \n$2"
+	done
+}
+
+do_shutdown() {
+	# shutdown slave machine
+	ssh -i /etc/nut/shutdown.key root@othermachine halt
+	upsmon -c fsd
+}
+
+if [[ "${BASH_SOURCE[0]}" = "$0" ]]; then
+  main "$@"
+fi
