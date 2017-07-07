@@ -1,4 +1,6 @@
 # Network UPS Tools: Master upsd.users
+# verson 1.0
+#
 # ============================================================================
 # Original: https://github.com/networkupstools/nut/blob/master/conf/upsd.users.sample
 #
@@ -30,11 +32,11 @@
 # ============================================================================
 
 [upsmaster]
-    password  = <masterpassword>
-    actions = SET
-    instcmds = ALL
-    upsmon master
+password  = <masterpassword>
+actions = SET
+instcmds = ALL
+upsmon master
 
 [upsslave]
-    password = <slavepassword>
-    upsmon slave
+password = <slavepassword>
+upsmon slave

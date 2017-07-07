@@ -1,103 +1,114 @@
 #!/bin/bash
 # perform actions depending on UPS event
+#
+# Verson 1.0
 
 main() {
 
-	# client site
-	site="MET"
-
 	# array of email addresses to notify 
-	notification_addresses=( techops@serrc.org nathanr@serrc.org )
+	notification_addresses=( techops@serrc.org )
+
+	# get status info of UPS
+	ups_status=$(upsc ${UPSNAME} > /dev/stdout 2> /dev/null)
+	ups_log=$(cat /var/log/messages | grep -i ups | tail -50)
+	ups_name="${UPSNAME%@*}"
 
 	case $1 in
 
 		replbatt)
-			get_ups_stats
 			notification_subject="Bad Battery"
-			notification_body="$UPSNAME has a bad battery, replacement needed. $ups_stats"
-			send_notification_email "$notification_subject" "$notification_body"
-			touch /var/run/nut/onbatt
+			notification_body="UPS ${ups_name} has a bad battery, replacement necessary"
+			send_notification_email "${notification_subject}" "${notification_body}"
 		;;
 
 		onbatt)
-			get_ups_stats
 			notification_subject="On Battery"
-			notification_body="$UPSNAME has been on battery for over five minutes. $ups_stats"
-			send_notification_email "$notification_subject" "$notification_body"
-			touch /var/run/nut/onbatt
+			notification_body="UPS ${ups_name} has been on battery for over five minutes"
+			send_notification_email "${notification_subject}" "${notification_body}"
+			touch /etc/nut/shutdown.key
 		;;
 
 		fsd)
-			get_ups_stats
-			notification_subject="Forced Shutdown"
-			notification_body="$UPSNAME is forcing shutdown. $ups_stats"
-			send_notification_email "$notification_subject" "$notification_body"
-			do_shutdown
+			notification_subject="Forced Shutdown in progress"
+			notification_body="UPS ${ups_name} is forcing shutdown of this system"
+			send_notification_email "${notification_subject}" "${notification_body}"
 		;;
 
-		shutdown)
-			get_ups_stats
+		powerdown)
 			notification_subject="System Shutdown"
-			notification_body="$UPSNAME is shutdowning down system. $ups_stats"
-			send_notification_email "$notification_subject" "$notification_body"
-			do_shutdown
+			notification_body="Battery critically low, UPS ${ups_name} is shuting down"
+			send_notification_email "${notification_subject}" "${notification_body}"
 		;;
 
 		online)
-			get_ups_stats
 			notification_subject="Power Restored"
-			notification_body="Power has been restored to $UPSNAME. $ups_stats"
-			send_notification_email "$notification_subject" "$notification_body"
+			notification_body="Power has been restored to UPS ${ups_name}."
+			send_notification_email "${notification_subject}" "${notification_body}"
 		;;
 	
-		NOCOMM)
+		nocomm)
 			notification_subject="Unavailable"
-			notification_body="$UPSNAME is unavailable."
-			send_notification_email "$notification_subject" "$notification_body"
+			notification_body="Communications with UPS ${ups_name} cannot be established"
+			send_notification_email "${notification_subject}" "${notification_body}"
 		;;
 
 		commbad)
 			notification_subject="Communication Lost"
-			notification_body="Communication has been lost with UPS $UPSNAME."
-			send_notification_email "$notification_subject" "$notification_body"
+			notification_body="Communications with the UPS ${ups_name} are lost"
+			send_notification_email "${notification_subject}" "${notification_body}"
 		;;
 
 		commok)
-			get_ups_stats
 			notification_subject="Communication Restored"
-			notification_body="Communication has been restored with UPS $UPSNAME. $ups_stats"
-			send_notification_email "$notification_subject" "$notification_body"
+			notification_body="Communications with the UPS ${ups_name} are established"
+			send_notification_email "${notification_subject}" "${notification_body}"
 		;;
 		
 		*)
-			echo "wrong parameter"
+			echo "invalid parameter"
 		;;
 	esac
 	
 	exit 0
 }
 
-get_ups_stats() {
-	# get UPS status info
-	ups_status=$(upsc $UPSNAME@localhost ups.status > /dev/stdout 2> /dev/null)
-	batt_charge=$(upsc $UPSNAME@localhost battery.charge > /dev/stdout 2> /dev/null)
-	batt_runtime=$(upsc $UPSNAME@localhost battery.runtime > /dev/stdout 2> /dev/null)
-	ups_log=$(cat /var/log/messages | grep ups | tail -50 > /dev/stdout 2> /dev/null)
-	ups_stats="\n\n\tUPS Status: $ups_status\n\tUPS Battery Charge: $batt_charge%\n\tUPS Runtime: $batt_runtime seconds\n\n\tNUT Log:\n\t$ups_log"
-}
-
 send_notification_email () {
-	# send notification email
-	date=$(/bin/date "+%Y/%m/%d %H:%M:%S")
-	for email_address in "${notification_addresses[@]}"; do
-		/usr/bin/mailx -s "$site UPS $UPSNAME $1" "$email_address" < "$date - Site: $site \n$2"
-	done
-}
+	# send notification email to all addresses in notification_addresses array
 
-do_shutdown() {
-	# shutdown slave machine
-	ssh -i /etc/nut/shutdown.key root@othermachine halt
-	upsmon -c fsd
+	domain=$(hostname -d)
+	IFS=$'\n'
+	for email_address in "${notification_addresses[@]}"; do
+		(
+		echo "From: devices@$(hostname -d)"
+		echo "To: ${email_address}"
+		echo "Subject: ${domain}: UPS ${ups_name} - ${1}"
+		echo "Content-Type: text/html"
+		echo "MIME-Version: 1.0"
+		echo "<html><body>"
+		echo "<br>$(date)<br><br>"
+		echo "<strong>Site:</strong> $domain <br>"
+		echo "<strong>Name:</strong> ${ups_name}<br><br>"
+		echo "<strong>Message:</strong><br>$2<br><br>"
+		echo "<hr><h3>Latest UPS status:</h3>"
+		if ! [ -z "${ups_status}" ]; then
+			for line in ${ups_status[@]}; do
+				echo "$line<br>"
+			done
+		else
+			echo "Not available<br>"
+		fi
+		echo "<hr><h3>Latest UPS log entries:</h3>"
+		if ! [ -z "${ups_status}" ]; then
+			for line in ${ups_log[@]}; do
+				echo "$line<br>"
+			done
+		else
+			echo "No recent log entries<br>"
+		fi
+		echo "</body>"
+		echo "</html>"
+		) | sendmail -t
+	done
 }
 
 if [[ "${BASH_SOURCE[0]}" = "$0" ]]; then
