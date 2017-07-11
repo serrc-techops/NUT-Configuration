@@ -15,20 +15,27 @@ main() {
 
 	case $1 in
 
-		replbatt)
+		replace_battery)
 			notification_subject="Bad Battery"
 			notification_body="UPS ${ups_name} has a bad battery, replacement necessary"
 			send_notification_email "${notification_subject}" "${notification_body}"
 		;;
 
-		onbatt)
+		on_battery
 			notification_subject="On Battery"
 			notification_body="UPS ${ups_name} has been on battery for over five minutes"
 			send_notification_email "${notification_subject}" "${notification_body}"
 			touch /etc/nut/shutdown.key
 		;;
 
-		fsd)
+		low_battery)
+			notification_subject="Low Battery"
+			notification_body="UPS ${ups_name} battery is getting low. Client shutdown will happen soon"
+			send_notification_email "${notification_subject}" "${notification_body}"
+			touch /etc/nut/shutdown.key
+		;;
+
+		forced_shutdown)
 			notification_subject="Forced Shutdown in progress"
 			notification_body="UPS ${ups_name} is forcing shutdown of this system"
 			send_notification_email "${notification_subject}" "${notification_body}"
@@ -40,25 +47,19 @@ main() {
 			send_notification_email "${notification_subject}" "${notification_body}"
 		;;
 
-		online)
+		on_line)
 			notification_subject="Power Restored"
 			notification_body="Power has been restored to UPS ${ups_name}."
 			send_notification_email "${notification_subject}" "${notification_body}"
 		;;
-	
-		nocomm)
-			notification_subject="Unavailable"
-			notification_body="Communications with UPS ${ups_name} cannot be established"
-			send_notification_email "${notification_subject}" "${notification_body}"
-		;;
 
-		commbad)
+		communications_bad)
 			notification_subject="Communication Lost"
 			notification_body="Communications with the UPS ${ups_name} are lost"
 			send_notification_email "${notification_subject}" "${notification_body}"
 		;;
 
-		commok)
+		communications_ok)
 			notification_subject="Communication Restored"
 			notification_body="Communications with the UPS ${ups_name} are established"
 			send_notification_email "${notification_subject}" "${notification_body}"
