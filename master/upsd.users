@@ -40,3 +40,8 @@ upsmon master
 [upsslave]
 password = <slavepassword>
 upsmon slave
+
+# QNAP user account
+[admin]
+password = 123456
+upsmon master
