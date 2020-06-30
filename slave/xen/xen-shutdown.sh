@@ -36,7 +36,7 @@ main () {
 	log_date "xen-shutdown.sh version $version"
 	log_date "==============================================================================="
 
-        log_date "Disable HA for pool..."
+	log_date "Disable HA for pool..."
 	xe pool-ha-disable
 	
 	# Get UUIDs of all running VMs
